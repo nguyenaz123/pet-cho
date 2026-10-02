@@ -30,16 +30,34 @@ export const SLEEP_DECAY_FACTOR: Record<Exclude<StatKey, "energy">, number> = {
 };
 export const SLEEP_ENERGY_REGEN_PER_HOUR = 20;
 
-/** All stats above this: the pet thrives and gains EXP. */
+/** All stats above this: the pet thrives and earns bonus EXP. */
 export const THRIVING_THRESHOLD = 70;
-/** Any stat below this: the pet gets sick and loses EXP. */
-export const SICK_THRESHOLD = 20;
+/** Stat bars turn red below this. Visual warning only. */
+export const LOW_STAT_THRESHOLD = 20;
 
-export const EXP_GAIN_PER_HOUR = 10;
-export const EXP_LOSS_PER_HOUR = 15;
 export const MAX_LEVEL = 30;
-/** EXP needed to go from `level` to `level + 1`. */
-export const expToNext = (level: number) => 50 + level * 25;
+/** EXP needed to go from `level` to `level + 1`. Grows quadratically. */
+export const expToNext = (level: number) => 50 + level * 25 + 2 * level * level;
+
+/** EXP earned per game hour just by being alive (no stat at 0); shrinks as the pet levels up. */
+export const PASSIVE_EXP_BASE = 24;
+export const PASSIVE_EXP_FALLOFF = 0.1;
+export const passiveExpPerHour = (level: number) => PASSIVE_EXP_BASE / (1 + PASSIVE_EXP_FALLOFF * (level - 1));
+
+/** Bonus EXP per game hour while thriving, on top of the passive gain. */
+export const CARE_EXP_PER_HOUR = 10;
+
+/**
+ * EXP lost per game hour while `emptyStats` stats sit at 0, scaled by the current level's
+ * bar so the penalty stays as painful at high levels: 5% of the bar for one empty stat,
+ * doubling for each extra one (10%, 20%, 40%).
+ */
+export const EXP_LOSS_RATIO_PER_HOUR = 0.05;
+export const expLossPerHour = (level: number, emptyStats: number) =>
+  emptyStats === 0 ? 0 : EXP_LOSS_RATIO_PER_HOUR * 2 ** (emptyStats - 1) * expToNext(level);
+
+/** Sick (every stat at 0) costs a whole level, at most once per this interval. */
+export const SICK_LEVEL_PENALTY_INTERVAL_MS = gameHours(24);
 
 export const PUBERTY_LEVEL = 6;
 export const ADULT_LEVEL = 16;

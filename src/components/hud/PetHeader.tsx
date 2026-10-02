@@ -5,14 +5,16 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { MAX_LEVEL, STAGE_LABEL, expToNext } from "@/lib/game/constants";
-import { getLifeStage, msUntilNextEstrus } from "@/lib/game/engine";
+import { countEmptyStats, getLifeStage, msUntilNextEstrus } from "@/lib/game/engine";
+import { PetAvatar } from "@/components/pet/PetSprite";
 import type { PetData } from "@/types/pet";
 
 dayjs.extend(relativeTime);
 
 interface Props {
   pet: PetData;
-  onRename: (name: string) => void;
+  /** Omit for a read-only header (visiting someone else's pet). */
+  onRename?: (name: string) => void;
 }
 
 export default function PetHeader({ pet, onRename }: Props) {
@@ -23,15 +25,16 @@ export default function PetHeader({ pet, onRename }: Props) {
   const maxed = pet.level >= MAX_LEVEL;
   const progress = maxed ? 1 : Math.min(1, pet.exp / need);
   const heatIn = msUntilNextEstrus(pet, pet.lastUpdated);
+  const emptyStats = countEmptyStats(pet.stats);
 
   const commit = () => {
-    onRename(draft);
+    onRename?.(draft);
     setEditing(false);
   };
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
-      <LevelRing level={pet.level} progress={progress} label={maxed ? "Max level" : `${Math.floor(pet.exp)} of ${need} EXP`} />
+      <LevelRing pet={pet} progress={progress} label={maxed ? "Max level" : `${Math.floor(pet.exp)} of ${need} EXP`} />
 
       <div className="min-w-0 flex-1">
         {editing ? (
@@ -52,6 +55,8 @@ export default function PetHeader({ pet, onRename }: Props) {
               onBlur={commit}
             />
           </form>
+        ) : !onRename ? (
+          <h1 className="truncate py-1 font-display text-[13px] leading-tight">{pet.petName}</h1>
         ) : (
           <button
             type="button"
@@ -68,6 +73,11 @@ export default function PetHeader({ pet, onRename }: Props) {
         <p className="mt-1 truncate text-[14px] text-muted">
           {STAGE_LABEL[stage]} · {maxed ? "Max level" : `${Math.floor(pet.exp)}/${need} EXP`}
         </p>
+        {emptyStats > 0 && (
+          <p className="anim-soft-pulse truncate text-[13px] font-semibold text-bad">
+            Losing EXP · {emptyStats} empty stat{emptyStats > 1 ? "s" : ""}
+          </p>
+        )}
         {heatIn !== null && (
           <p className="truncate text-[13px] text-muted">
             {heatIn === 0 ? "In heat right now" : `Next heat ${dayjs(pet.lastUpdated + heatIn).from(pet.lastUpdated)}`}
@@ -80,9 +90,10 @@ export default function PetHeader({ pet, onRename }: Props) {
 
 const R = 23;
 
-function LevelRing({ level, progress, label }: { level: number; progress: number; label: string }) {
+/** The pup's face inside an EXP ring, with the level on a badge. */
+export function LevelRing({ pet, progress, label }: { pet: PetData; progress: number; label: string }) {
   return (
-    <div className="relative size-14 shrink-0" role="img" aria-label={`Level ${level}, ${label}`}>
+    <div className="relative size-14 shrink-0" role="img" aria-label={`Level ${pet.level}, ${label}`}>
       <svg viewBox="0 0 56 56" className="absolute inset-0 -rotate-90">
         <circle cx="28" cy="28" r={R} fill="var(--surface)" stroke="var(--line)" strokeWidth="5" />
         <motion.circle
@@ -98,16 +109,21 @@ function LevelRing({ level, progress, label }: { level: number; progress: number
           transition={{ type: "spring", stiffness: 80, damping: 20 }}
         />
       </svg>
-      <motion.div
-        key={level}
+      <PetAvatar
+        breed={pet.breed}
+        equipped={pet.equippedItems}
+        size={40}
+        className="pet-room absolute left-2 top-2 rounded-full"
+      />
+      <motion.span
+        key={pet.level}
         initial={{ scale: 1.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 400, damping: 14 }}
-        className="absolute inset-0 flex flex-col items-center justify-center leading-none"
+        className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-1.5 py-0.5 font-display text-[8px] leading-none text-on-accent ring-2 ring-surface"
       >
-        <span className="text-[10px] font-semibold text-muted">LV</span>
-        <span className="mt-0.5 font-display text-[12px]">{level}</span>
-      </motion.div>
+        {pet.level}
+      </motion.span>
     </div>
   );
 }

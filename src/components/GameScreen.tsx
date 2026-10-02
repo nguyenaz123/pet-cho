@@ -3,8 +3,9 @@
 /* eslint-disable @next/next/no-img-element -- tiny pixel SVG icons */
 import { MotionConfig, motion } from "framer-motion";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import FriendsModal from "@/components/FriendsModal";
 import OfflineReportModal from "@/components/OfflineReportModal";
-import WardrobeModal from "@/components/WardrobeModal";
+import ProfileModal from "@/components/ProfileModal";
 import ActionBar from "@/components/hud/ActionBar";
 import PetHeader from "@/components/hud/PetHeader";
 import StatBars from "@/components/hud/StatBars";
@@ -12,6 +13,7 @@ import PetStage from "@/components/pet/PetStage";
 import PressButton from "@/components/ui/PressButton";
 import { SfxProvider, useSfx } from "@/components/ui/SfxProvider";
 import Toasts from "@/components/ui/Toasts";
+import { COLUMN } from "@/components/ui/layout";
 import { useGameLoop } from "@/hooks/useGameLoop";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { TIME_SCALE } from "@/lib/game/constants";
@@ -26,9 +28,6 @@ export default function GameScreen() {
     </SfxProvider>
   );
 }
-
-/** Mobile-first column; on wider screens it simply stays phone-width in the middle. */
-const COLUMN = "relative mx-auto flex min-h-[100dvh] w-full max-w-[440px] flex-col gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]";
 
 /** Staggered entrance for the main blocks (hierarchy: pet first, then stats, then actions). */
 const enter = (i: number) => ({
@@ -45,9 +44,10 @@ function Game() {
   const toasts = usePetStore((s) => s.toasts);
   const floaters = usePetStore((s) => s.floaters);
   const offlineReport = usePetStore((s) => s.offlineReport);
-  const { init, perform, equip, rename, dismissOfflineReport, dismissToast, dismissFloater } = usePetStore.getState();
+  const { init, perform, equip, setBreed, rename, dismissOfflineReport, dismissToast, dismissFloater } = usePetStore.getState();
 
-  const [wardrobeOpen, setWardrobeOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
   const { enabled: sfxEnabled, toggle: toggleSfx, play } = useSfx();
   const bark = useCallback(() => play("woof"), [play]);
 
@@ -80,12 +80,13 @@ function Game() {
       <motion.header {...enter(0)} className="flex items-center gap-2 py-1">
         <PetHeader pet={pet} onRename={rename} />
         <IconButton
-          label="Wardrobe"
+          label="Profile"
           icon="dress"
           disabled={sleeping}
-          title={sleeping ? "Shh... sleeping!" : "Wardrobe"}
-          onClick={() => setWardrobeOpen(true)}
+          title={sleeping ? "Shh... sleeping!" : "Profile"}
+          onClick={() => setProfileOpen(true)}
         />
+        <IconButton label="Friends" icon="friends" onClick={() => setFriendsOpen(true)} />
         <IconButton
           label={sfxEnabled ? "Mute sound" : "Turn sound on"}
           icon={sfxEnabled ? "sound_on" : "sound_off"}
@@ -114,14 +115,21 @@ function Game() {
         <ActionBar pet={pet} now={pet.lastUpdated} onAction={perform} />
       </motion.nav>
 
-      <WardrobeModal open={wardrobeOpen} pet={pet} onEquip={equip} onClose={() => setWardrobeOpen(false)} />
+      <ProfileModal
+        open={profileOpen}
+        pet={pet}
+        onEquip={equip}
+        onBreed={setBreed}
+        onClose={() => setProfileOpen(false)}
+      />
+      <FriendsModal open={friendsOpen} myUid={pet.ownerId} myPetName={pet.petName} onClose={() => setFriendsOpen(false)} />
       <OfflineReportModal report={offlineReport} onClose={dismissOfflineReport} />
       <Toasts toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }
 
-function IconButton({
+export function IconButton({
   label,
   icon,
   onClick,
@@ -162,6 +170,7 @@ function GameSkeleton() {
         </div>
         <div className="skeleton size-12 rounded-full" />
         <div className="skeleton size-12 rounded-full" />
+        <div className="skeleton size-12 rounded-full" />
       </div>
       <div className="bezel">
         <div className="skeleton h-[clamp(270px,44dvh,400px)] rounded-[22px]" />
@@ -180,7 +189,7 @@ function GameSkeleton() {
   );
 }
 
-function Notice({ title, children }: { title: string; children: ReactNode }) {
+export function Notice({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="flex min-h-[100dvh] items-center justify-center p-4">
       <motion.div

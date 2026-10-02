@@ -120,19 +120,76 @@ img,
 /* The room behind the pet                                             */
 /* ------------------------------------------------------------------ */
 .pet-room {
-  --wall: #cbe8f4;
-  --wall-2: #b6dcee;
-  --trim: #f4f8fa;
-  --floor: #d39a62;
-  --floor-2: #ba804a;
-  --floor-3: #a56f3d;
+  background: #cbe8f4;
+}
+
+/* One room per life stage (see RoomDecor): wall + skirting on the element, floor in ::before. */
+.room-bg {
   background:
-    /* skirting board */
     linear-gradient(to bottom, transparent 62%, var(--trim) 62%, var(--trim) 64%, var(--floor-3) 64%, var(--floor-3) 65.5%, transparent 65.5%),
-    /* floor planks */
-    repeating-linear-gradient(90deg, var(--floor) 0 46px, var(--floor-2) 46px 48px) 0 100% / 100% 35% no-repeat,
-    /* wallpaper stripes */
-    repeating-linear-gradient(90deg, var(--wall) 0 22px, var(--wall-2) 22px 24px);
+    var(--wallpaper);
+}
+.room-bg::before {
+  content: "";
+  position: absolute;
+  inset: 65.5% 0 0;
+  background: var(--flooring);
+}
+/* Puppy: pastel nursery, striped wallpaper, light planks */
+.room-bg[data-stage="PUPPY"] {
+  --trim: #f4f8fa;
+  --floor-3: #a56f3d;
+  --wallpaper: repeating-linear-gradient(90deg, #cbe8f4 0 22px, #b6dcee 22px 24px);
+  --flooring: repeating-linear-gradient(90deg, #d39a62 0 46px, #ba804a 46px 48px);
+}
+/* Teen: mint polka dots, darker narrow planks */
+.room-bg[data-stage="TEEN"] {
+  --trim: #fffaf0;
+  --floor-3: #85552c;
+  --wallpaper:
+    radial-gradient(circle, #b3e2c8 3px, transparent 3.5px) 0 0 / 26px 26px,
+    radial-gradient(circle, #b3e2c8 3px, transparent 3.5px) 13px 13px / 26px 26px,
+    #d3f0e0;
+  --flooring: repeating-linear-gradient(90deg, #b9804c 0 30px, #9f6a3a 30px 32px);
+}
+/* Adult: cream wall over wood wainscoting, parquet floor */
+.room-bg[data-stage="ADULT"] {
+  --trim: #fdf6e8;
+  --floor-3: #6f3f22;
+  --wallpaper:
+    linear-gradient(to bottom, transparent 41%, #fdf6e8 41%, #fdf6e8 43%, transparent 43%),
+    repeating-linear-gradient(90deg, #c08a5b 0 44px, #a87547 44px 48px) 0 100% / 100% 57% no-repeat,
+    repeating-linear-gradient(90deg, #f3e6cf 0 40px, #e7d5b6 40px 42px);
+  --flooring: repeating-conic-gradient(#a8683a 0 25%, #8e5530 0 50%) 0 0 / 48px 24px;
+}
+
+.room-rug {
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.15);
+}
+[data-stage="TEEN"] .room-rug {
+  border-radius: 10px;
+  width: 70%;
+  background: repeating-linear-gradient(90deg, #e9785b 0 14px, #f6dcb3 14px 28px);
+  box-shadow: inset 0 0 0 3px #b5523a;
+  opacity: 0.8;
+}
+[data-stage="ADULT"] .room-rug {
+  background: radial-gradient(ellipse, #b33a3a 0 45%, #f2e3c6 46% 52%, #8c2a2a 53%);
+  opacity: 0.85;
+}
+
+.room-curtain {
+  position: absolute;
+  z-index: 1;
+  top: -10%;
+  bottom: -14%;
+  width: 34%;
+  border-radius: 0 0 6px 6px;
+  background: repeating-linear-gradient(90deg, #b33a3a 0 5px, #8c2a2a 5px 7px);
+}
+.is-night .decor-lamp {
+  filter: drop-shadow(0 0 14px #ffe9a0) brightness(1.4);
 }
 .pet-room::after {
   /* night: a cool dim layer over the whole scene */

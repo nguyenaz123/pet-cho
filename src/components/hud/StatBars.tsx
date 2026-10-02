@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- tiny pixel SVG icons */
 import { AnimatePresence, motion } from "framer-motion";
-import { SICK_THRESHOLD, THRIVING_THRESHOLD } from "@/lib/game/constants";
+import { LOW_STAT_THRESHOLD, THRIVING_THRESHOLD } from "@/lib/game/constants";
 import { STAT_KEYS } from "@/lib/game/engine";
 import type { Floater } from "@/store/usePetStore";
 import type { PetStats, StatKey } from "@/types/pet";
@@ -15,7 +15,7 @@ const LABEL: Record<StatKey, string> = {
 };
 
 function tone(v: number) {
-  if (v < SICK_THRESHOLD) return { bar: "bg-bad", text: "text-bad" };
+  if (v < LOW_STAT_THRESHOLD) return { bar: "bg-bad", text: "text-bad" };
   if (v <= THRIVING_THRESHOLD) return { bar: "bg-warn", text: "text-ink" };
   return { bar: "bg-good", text: "text-ink" };
 }
@@ -35,7 +35,7 @@ export default function StatBars({ stats, floaters, onFloaterDone }: Props) {
       {STAT_KEYS.map((key) => {
         const value = Math.round(stats[key]);
         const t = tone(value);
-        const low = value < SICK_THRESHOLD;
+        const low = value < LOW_STAT_THRESHOLD;
         return (
           <div key={key} className="bezel-core relative px-3.5 pb-3.5 pt-3">
             <div className="mb-2.5 flex items-center justify-between gap-2">

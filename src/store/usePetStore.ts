@@ -1,11 +1,14 @@
 "use client";
 
 import { create } from "zustand";
-import { applyAction, calculateOfflineDecay, getLifeStage, type StatDelta } from "@/lib/game/engine";
+import { STAT_KEYS, applyAction, calculateOfflineDecay, getLifeStage, type StatDelta } from "@/lib/game/engine";
 import { PARTNER_LEVEL, PARTNER_NAME, STAGE_LABEL } from "@/lib/game/constants";
+import { getBreed } from "@/lib/game/breeds";
 import { getWearable } from "@/lib/game/items";
 import { ensureAnonymousUser, loadOrCreatePet, savePet } from "@/lib/petRepository";
-import type { EquipSlot, PetAction, PetData, StatKey } from "@/types/pet";
+import type { BreedId, EquipSlot, PetAction, PetData, StatKey } from "@/types/pet";
+
+const STAT_LABEL: Record<StatKey, string> = { hunger: "Food", hygiene: "Clean", energy: "Energy", happiness: "Joy" };
 
 export type Activity = "eating" | "bathing" | "petting" | "walking" | "playing";
 const ACTIVITY_FOR: Partial<Record<PetAction, Activity>> = {
@@ -52,6 +55,7 @@ interface PetState {
   tick: () => void;
   perform: (action: PetAction) => void;
   equip: (slot: EquipSlot, itemId: string | null) => void;
+  setBreed: (breed: BreedId) => void;
   rename: (name: string) => void;
   save: () => Promise<void>;
   dismissOfflineReport: () => void;
@@ -71,12 +75,30 @@ function describeChanges(prev: PetData, next: PetData): Omit<Toast, "id">[] {
 
   const prevStage = getLifeStage(prev.level);
   const nextStage = getLifeStage(next.level);
-  if (prevStage !== nextStage) out.push({ text: `Now a ${STAGE_LABEL[nextStage]}!`, tone: "info" });
+  if (prevStage !== nextStage) {
+    const grewUp = next.level > prev.level;
+    out.push({ text: `Now a ${STAGE_LABEL[nextStage]}!${grewUp ? " New room unlocked" : ""}`, tone: "info" });
+  }
   if (prev.level < PARTNER_LEVEL && next.level >= PARTNER_LEVEL) {
     out.push({ text: `${PARTNER_NAME} moved in. ${next.petName} has a sweetheart!`, tone: "good" });
   }
   if (prev.level >= PARTNER_LEVEL && next.level < PARTNER_LEVEL) {
     out.push({ text: `${PARTNER_NAME} went home for now...`, tone: "bad" });
+  }
+  for (const slot of Object.keys(next.equippedItems) as EquipSlot[]) {
+    const removed = getWearable(prev.equippedItems[slot]);
+    if (removed && next.equippedItems[slot] === null && next.level < prev.level) {
+      out.push({ text: `${removed.name} came off (needs LV ${removed.minLevel})`, tone: "bad" });
+    }
+  }
+  const lostBreed = getBreed(prev.breed);
+  if (lostBreed && next.breed !== prev.breed && next.level < prev.level) {
+    out.push({ text: `Back to ${getBreed(next.breed)?.name} (${lostBreed.name} needs LV ${lostBreed.minLevel})`, tone: "bad" });
+  }
+  for (const key of STAT_KEYS) {
+    if (prev.stats[key] > 0 && next.stats[key] <= 0) {
+      out.push({ text: `${STAT_LABEL[key]} is empty! Losing EXP...`, tone: "bad" });
+    }
   }
 
   if (prev.status !== next.status) {
@@ -170,6 +192,14 @@ export const usePetStore = create<PetState>()((set, get) => {
       const item = getWearable(itemId);
       if (item && (item.slot !== slot || item.minLevel > pet.level)) return;
       set({ pet: { ...pet, equippedItems: { ...pet.equippedItems, [slot]: itemId } } });
+      scheduleSave();
+    },
+
+    setBreed: (breed) => {
+      const { pet } = get();
+      const info = getBreed(breed);
+      if (!pet || !info || info.minLevel > pet.level || pet.breed === breed) return;
+      set({ pet: { ...pet, breed } });
       scheduleSave();
     },
 

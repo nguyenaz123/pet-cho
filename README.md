@@ -34,7 +34,7 @@ src/
     globals.css           Light/dark design tokens, room scene, keyframes (all off under reduced motion)
   components/
     GameScreen.tsx        Main screen: wires store + loop + UI
-    WardrobeModal.tsx     Equip hats / clothes
+    ProfileModal.tsx      Pick breed (avatar) / hats / clothes
     OfflineReportModal.tsx "Welcome back" summary after time away
     hud/                  PetHeader (name, LV, stage, EXP), StatBars, ActionBar
     pet/                  PetSprite (layered sprite + partner), PetStage (room, wandering, effects)
@@ -47,7 +47,8 @@ src/
     game/
       constants.ts        All balance numbers (decay rates, thresholds, cycle lengths)
       engine.ts           Pure game logic: calculateOfflineDecay, applyAction, status
-      items.ts            Wearable catalogue
+      breeds.ts           Breed catalogue (level-gated)
+      items.ts            Wearable catalogue (level-gated)
   store/
     usePetStore.ts        Zustand store: init, tick, actions, debounced save, toasts
   types/
@@ -57,7 +58,7 @@ scripts/                  generate-sprites.mjs
 firestore.rules           Security rules: users can only touch their own pet
 ```
 
-The game logic in `lib/game/engine.ts` doesn't depend on React or Firebase. The same `calculateOfflineDecay(pet, now)` advances the pet when the app opens (offline time) and on every live tick. Long gaps are simulated in up to 2,000 steps, so threshold effects happen at about the right time: EXP stops when a stat drops below 70, the pup wakes up when its energy is full, and heat starts on schedule.
+The game logic in `lib/game/engine.ts` doesn't depend on React or Firebase. The same `calculateOfflineDecay(pet, now)` advances the pet when the app opens (offline time) and on every live tick. Long gaps are simulated in up to 2,000 steps, so threshold effects happen at about the right time: the care bonus stops when a stat drops below 70, EXP starts draining when a stat hits 0, the pup wakes up when its energy is full, and heat starts on schedule.
 
 ## Game rules
 
@@ -65,11 +66,15 @@ The game logic in `lib/game/engine.ts` doesn't depend on React or Firebase. The 
 | --- | --- |
 | Stat decay while awake | Food 6/h, Clean 4/h, Energy 5/h, Joy 5/h |
 | Sleeping | Energy +20/h; other stats decay at 25–50% speed; wakes when energy reaches 100 |
-| All stats > 70 | +10 EXP/h; level up when EXP reaches `50 + level × 25` |
-| Any stat < 20 | Status SICK, −15 EXP/h; when EXP drops below 0 the pup loses a level |
+| Level up | When EXP reaches `50 + 25·level + 2·level²` |
+| No stat at 0 | +`24 / (1 + 0.1·(level − 1))` EXP/h passively (24 at LV 1, ~6 at LV 29) |
+| All stats > 70 | +10 EXP/h on top of the passive gain |
+| n stats at 0 | No passive gain; −`5% × 2^(n−1)` of the current level's bar per hour (5/10/20/40%). EXP below 0 drops a level |
+| All 4 stats at 0 | Status SICK: also −1 level at once, then again every 24h, at most once per 24h |
+| Stage floor | The pup never drops below a stage it has reached (Teen: LV 6, Adult: LV 16) |
 | Life stages | LV 1–5 Puppy · LV 6–15 Teen · LV 16+ Adult (max LV 30) |
 | Actions | Feed, Bathe, Pet, Walk and Sleep from LV 1; Toy from LV 6 |
-| Partner | At LV 6 a sweetheart (Mochi) moves in and follows the pup around; she leaves if the pup drops below LV 6 |
+| Partner | At LV 6 a sweetheart (Mochi) moves in and follows the pup around |
 | Heat (estrus) | From LV 6: every 72h, lasts 12h. Joy drains 2× and the pup barks. Walk/Toy calms it for 4h |
 
 All of these numbers are in `src/lib/game/constants.ts`.
@@ -88,12 +93,14 @@ All of these numbers are in `src/lib/game/constants.ts`.
   "lastUpdated": 1710000000000,    // epoch ms
   // added on top of the base schema:
   "createdAt": 1710000000000,
+  "breed": "shiba",                // shiba | husky | choco | dalmatian | pug | poodle | golden; also the avatar
   "pubertyAt": null,               // epoch ms when LV 6 was first reached; anchors the heat cycle
   "estrusSoothedUntil": 0,         // epoch ms; set by Walk / Toy
-  "lastActionAt": { "feed": 1710000000000 } // cooldowns that survive reloads
+  "lastActionAt": { "feed": 1710000000000 }, // cooldowns that survive reloads
+  "lastSickPenaltyAt": null        // epoch ms of the last level lost to sickness
 }
 ```
 
 ## Clothing layers
 
-Every sprite (dog poses and wearables) is a transparent 32×32 image on the same grid. `PetSprite` stacks them with `position: absolute`, so items line up in every pose. To use your own PNGs, put them in `public/sprites/items/` and point `src` in `lib/game/items.ts` at them.
+Every sprite (dog poses per breed in `public/sprites/dog/<breed>/`, and wearables) is a transparent 32×32 image on the same grid; all breeds share one silhouette, so every item fits every breed. `PetSprite` stacks them with `position: absolute`, so items line up in every pose. To use your own PNGs, put them in `public/sprites/items/` and point `src` in `lib/game/items.ts` at them.

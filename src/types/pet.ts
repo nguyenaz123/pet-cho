@@ -10,12 +10,16 @@ export type EquippedItems = Record<EquipSlot, string | null>;
 
 export type PetAction = "feed" | "bathe" | "sleep" | "pet" | "walk" | "toy";
 
+export type BreedId = "shiba" | "husky" | "choco" | "dalmatian" | "pug" | "poodle" | "golden";
+
 export type LifeStage = "PUPPY" | "TEEN" | "ADULT";
 
 /** Firestore document: pets/{userId} */
 export interface PetData {
   ownerId: string;
   petName: string;
+  /** Picked in the profile; also the player's avatar. */
+  breed: BreedId;
   level: number;
   exp: number;
   stats: PetStats;
@@ -32,4 +36,6 @@ export interface PetData {
   estrusSoothedUntil: number;
   /** Epoch ms of each action's last use, for cooldowns that survive reloads. */
   lastActionAt: Partial<Record<PetAction, number>>;
+  /** Epoch ms of the last level lost to sickness; limits it to one per SICK_LEVEL_PENALTY_INTERVAL_MS. */
+  lastSickPenaltyAt: number | null;
 }

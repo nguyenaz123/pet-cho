@@ -4,6 +4,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import PetSprite, { PartnerSprite, type PartnerPose, type SpritePose } from "./PetSprite";
+import RoomDecor from "./RoomDecor";
 import { PARTNER_LEVEL, PARTNER_NAME } from "@/lib/game/constants";
 import { getLifeStage } from "@/lib/game/engine";
 import type { Activity } from "@/store/usePetStore";
@@ -133,9 +134,7 @@ export default function PetStage({ pet, activity, onBark }: Props) {
       ref={roomRef}
       className={`pet-room relative h-[clamp(270px,44dvh,400px)] overflow-hidden rounded-[22px] ${sleeping ? "is-night" : ""}`}
     >
-      <div aria-hidden className="room-window absolute left-[9%] top-[11%] aspect-[4/3] h-[24%] rounded-[6px]" />
-      {/* rug */}
-      <div aria-hidden className="absolute bottom-[4%] left-1/2 h-[16%] w-[78%] -translate-x-1/2 rounded-[50%] bg-white/15" />
+      <RoomDecor stage={stage} scale={roomW < 400 ? 3 : 4} />
 
       <AnimatePresence>
         {(sick || inHeat || sleeping) && (
@@ -196,7 +195,7 @@ export default function PetStage({ pet, activity, onBark }: Props) {
       >
         <Shadow width={size} />
         <div className={`relative ${bodyClass(moving.pup)}`}>
-          <PetSprite pose={poseFor(pet, activity)} equipped={pet.equippedItems} size={size} />
+          <PetSprite pose={poseFor(pet, activity)} breed={pet.breed} equipped={pet.equippedItems} size={size} />
         </div>
 
         <AnimatePresence>

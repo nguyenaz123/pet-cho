@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import Modal from "@/components/ui/Modal";
 import PressButton from "@/components/ui/PressButton";
-import { STAT_KEYS } from "@/lib/game/engine";
+import { STAT_KEYS, totalExp } from "@/lib/game/engine";
 import { TIME_SCALE } from "@/lib/game/constants";
 import type { OfflineReport } from "@/store/usePetStore";
 
@@ -14,6 +14,9 @@ dayjs.extend(relativeTime);
 const LABEL = { hunger: "Food", hygiene: "Clean", energy: "Energy", happiness: "Joy" } as const;
 
 export default function OfflineReportModal({ report, onClose }: { report: OfflineReport | null; onClose: () => void }) {
+  const expDiff = report
+    ? Math.round(totalExp(report.after.level, report.after.exp) - totalExp(report.before.level, report.before.exp))
+    : 0;
   return (
     <Modal open={report !== null} title="Welcome back!" onClose={onClose}>
       {report && (
@@ -53,13 +56,14 @@ export default function OfflineReportModal({ report, onClose }: { report: Offlin
             })}
           </div>
 
-          {report.after.level !== report.before.level && (
+          {expDiff !== 0 && (
             <p
               className={`rounded-full px-4 py-2 text-center font-display text-[11px] ${
-                report.after.level > report.before.level ? "bg-good/15 text-good" : "bg-bad/15 text-bad"
+                expDiff > 0 ? "bg-good/15 text-good" : "bg-bad/15 text-bad"
               }`}
             >
-              LV {report.before.level} → LV {report.after.level}
+              {report.after.level !== report.before.level && `LV ${report.before.level} → LV ${report.after.level} · `}
+              {expDiff > 0 ? `+${expDiff}` : expDiff} EXP
             </p>
           )}
 
