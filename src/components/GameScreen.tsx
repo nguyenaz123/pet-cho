@@ -16,7 +16,6 @@ import Toasts from "@/components/ui/Toasts";
 import { COLUMN } from "@/components/ui/layout";
 import { useGameLoop } from "@/hooks/useGameLoop";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { TIME_SCALE } from "@/lib/game/constants";
 import { usePetStore } from "@/store/usePetStore";
 
 export default function GameScreen() {
@@ -76,7 +75,7 @@ function Game() {
   const sleeping = pet.status === "SLEEPING";
 
   return (
-    <main className={COLUMN}>
+    <main className={`${COLUMN} h-[100dvh]`}>
       <motion.header {...enter(0)} className="flex items-center gap-2 py-1">
         <PetHeader pet={pet} onRename={rename} />
         <IconButton
@@ -95,22 +94,16 @@ function Game() {
         />
       </motion.header>
 
-      <motion.section {...enter(1)} className="bezel" aria-label="Pet room">
-        <PetStage pet={pet} activity={activity?.type ?? null} onBark={bark} />
+      <motion.section {...enter(1)} className="bezel flex min-h-[160px] flex-1 flex-col" aria-label="Pet room">
+        <PetStage pet={pet} activity={activity?.type ?? null} onBark={bark} fill />
       </motion.section>
 
       <motion.section {...enter(2)} aria-label="Stats">
         <StatBars stats={pet.stats} floaters={floaters} onFloaterDone={dismissFloater} />
       </motion.section>
 
-      {TIME_SCALE !== 1 && <p className="text-center text-[13px] text-muted">Test speed x{TIME_SCALE}</p>}
-
-      {/* Thumb zone: the action dock sticks to the bottom of the screen. */}
-      <motion.nav
-        {...enter(3)}
-        aria-label="Actions"
-        className="sticky bottom-0 z-10 -mx-4 mt-auto bg-gradient-to-t from-canvas from-75% to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4"
-      >
+      {/* Thumb zone: the pet room flexes so the action dock always sits at the bottom of one screen. */}
+      <motion.nav {...enter(3)} aria-label="Actions" className="pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {/* pet.lastUpdated advances every tick, so it doubles as the UI clock for cooldowns. */}
         <ActionBar pet={pet} now={pet.lastUpdated} onAction={perform} />
       </motion.nav>
@@ -161,7 +154,7 @@ export function IconButton({
 /** Same shape as the real screen, so nothing jumps when the pup loads. */
 function GameSkeleton() {
   return (
-    <main className={COLUMN} aria-busy="true" aria-label="Loading your pup">
+    <main className={`${COLUMN} h-[100dvh]`} aria-busy="true" aria-label="Loading your pup">
       <div className="flex items-center gap-3 py-1">
         <div className="skeleton size-14 rounded-full" />
         <div className="flex-1 space-y-2">
@@ -172,15 +165,15 @@ function GameSkeleton() {
         <div className="skeleton size-12 rounded-full" />
         <div className="skeleton size-12 rounded-full" />
       </div>
-      <div className="bezel">
-        <div className="skeleton h-[clamp(270px,44dvh,400px)] rounded-[22px]" />
+      <div className="bezel flex min-h-[160px] flex-1 flex-col">
+        <div className="skeleton flex-1 rounded-[22px]" />
       </div>
       <div className="bezel grid grid-cols-2 gap-1.5">
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="skeleton h-[74px] rounded-[22px]" />
         ))}
       </div>
-      <div className="bezel mt-auto mb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-3 gap-1.5">
+      <div className="bezel mb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-3 gap-1.5">
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="skeleton h-[94px] rounded-[22px]" />
         ))}

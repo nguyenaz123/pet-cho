@@ -19,6 +19,8 @@ interface Props {
   pet: PetData;
   activity: Activity | null;
   onBark: () => void;
+  /** Grow to fill a flex parent instead of using the fixed room height. */
+  fill?: boolean;
 }
 
 /** A target spot on the floor: x in -1..1 of the free floor width, plus travel time in seconds. */
@@ -43,7 +45,7 @@ function partnerPoseFor(pet: PetData, activity: Activity | null): PartnerPose {
 const clampUnit = (v: number) => Math.max(-1, Math.min(1, v));
 const travelTime = (from: number, to: number) => 0.5 + Math.abs(to - from) * 1.3;
 
-export default function PetStage({ pet, activity, onBark }: Props) {
+export default function PetStage({ pet, activity, onBark, fill }: Props) {
   const reduceMotion = useReducedMotion();
   const roomRef = useRef<HTMLDivElement>(null);
   const [roomW, setRoomW] = useState(360);
@@ -132,7 +134,7 @@ export default function PetStage({ pet, activity, onBark }: Props) {
   return (
     <div
       ref={roomRef}
-      className={`pet-room relative h-[clamp(270px,44dvh,400px)] overflow-hidden rounded-[22px] ${sleeping ? "is-night" : ""}`}
+      className={`pet-room relative ${fill ? "flex-1" : "h-[clamp(270px,44dvh,400px)]"} overflow-hidden rounded-[22px] ${sleeping ? "is-night" : ""}`}
     >
       <RoomDecor stage={stage} scale={roomW < 400 ? 3 : 4} />
 

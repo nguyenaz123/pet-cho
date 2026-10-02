@@ -47,7 +47,7 @@ export default function PetHeader({ pet, onRename }: Props) {
             <input
               autoFocus
               aria-label="Pet name"
-              className="w-full rounded-[10px] bg-raised px-2 py-1 font-display text-[13px] text-ink outline-none ring-2 ring-accent"
+              className="w-full rounded-[10px] bg-raised px-2 py-0.5 font-display text-[16px] text-ink outline-none ring-2 ring-accent"
               value={draft}
               maxLength={16}
               enterKeyHint="done"
