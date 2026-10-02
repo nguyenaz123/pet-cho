@@ -1,0 +1,249 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Light and dark values swap under prefers-color-scheme; components only
+ * ever reference the semantic names below (bg-surface, text-muted, bg-accent...).
+ *
+ * Shape rule: shells 28px, cores 22px (concentric), buttons 18px, chips/pills full.
+ * One accent (coral). Green/amber/red appear only as stat health, never as decoration.
+ */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-shell: var(--shell);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --font-display: var(--font-pixel), monospace;
+  --font-body: var(--font-pixel-body), system-ui, sans-serif;
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root {
+  --canvas: #e6ebf0;
+  --shell: rgb(27 34 44 / 0.05);
+  --surface: #f8fafb;
+  --raised: #ffffff;
+  --ink: #1b222c;
+  --muted: #566170;
+  --line: rgb(27 34 44 / 0.09);
+  --accent: #c23d22;
+  --on-accent: #fff8f5;
+  --good: #22804a;
+  --warn: #d9961a;
+  --bad: #c2362d;
+  --shadow-rgb: 39 52 71;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0f1318;
+    --shell: rgb(255 255 255 / 0.035);
+    --surface: #181d25;
+    --raised: #212833;
+    --ink: #eef1f5;
+    --muted: #9ca6b4;
+    --line: rgb(255 255 255 / 0.08);
+    --accent: #ff7356;
+    --on-accent: #1e0e09;
+    --good: #4cc27c;
+    --warn: #f0b23e;
+    --bad: #ff6a5e;
+    --shadow-rgb: 0 0 0;
+    color-scheme: dark;
+  }
+}
+
+html,
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background-color: var(--canvas);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Soft accent glow at the top of the screen; fixed so it never repaints on scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
+}
+
+button {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Keep pixel art crisp at any scale. */
+img,
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+@layer components {
+  /* "Double bezel": a tinted tray (shell) holding a raised plate (core). */
+  .bezel {
+    border-radius: 28px;
+    padding: 6px;
+    background: var(--shell);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .bezel-core {
+    border-radius: 22px;
+    background: var(--surface);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 1px 2px rgb(var(--shadow-rgb) / 0.06),
+      0 12px 32px -12px rgb(var(--shadow-rgb) / 0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    .bezel-core {
+      box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.06),
+        0 12px 32px -12px rgb(0 0 0 / 0.6);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* The room behind the pet                                             */
+/* ------------------------------------------------------------------ */
+.pet-room {
+  --wall: #cbe8f4;
+  --wall-2: #b6dcee;
+  --trim: #f4f8fa;
+  --floor: #d39a62;
+  --floor-2: #ba804a;
+  --floor-3: #a56f3d;
+  background:
+    /* skirting board */
+    linear-gradient(to bottom, transparent 62%, var(--trim) 62%, var(--trim) 64%, var(--floor-3) 64%, var(--floor-3) 65.5%, transparent 65.5%),
+    /* floor planks */
+    repeating-linear-gradient(90deg, var(--floor) 0 46px, var(--floor-2) 46px 48px) 0 100% / 100% 35% no-repeat,
+    /* wallpaper stripes */
+    repeating-linear-gradient(90deg, var(--wall) 0 22px, var(--wall-2) 22px 24px);
+}
+.pet-room::after {
+  /* night: a cool dim layer over the whole scene */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #0b1530;
+  opacity: 0;
+  transition: opacity 900ms var(--ease-spring);
+}
+.pet-room.is-night::after {
+  opacity: 0.5;
+}
+
+.room-window {
+  background: linear-gradient(to bottom, #8fd3ff, #d9f1ff);
+  box-shadow: inset 0 0 0 4px #f4f8fa, inset 0 0 0 6px #a56f3d;
+}
+.room-window::before,
+.room-window::after {
+  content: "";
+  position: absolute;
+  background: #f4f8fa;
+}
+.room-window::before {
+  inset: 0 calc(50% - 2px);
+}
+.room-window::after {
+  inset: calc(50% - 2px) 0;
+}
+.is-night .room-window {
+  background: linear-gradient(to bottom, #13214a, #2b3d75);
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion (all of it collapses under prefers-reduced-motion)           */
+/* ------------------------------------------------------------------ */
+
+/* Idle "breathing" bob, stepped to look like 2-frame animation. */
+@keyframes pixel-bob {
+  0%, 49% { transform: translateY(0); }
+  50%, 100% { transform: translateY(-4px); }
+}
+.anim-bob { animation: pixel-bob 1s infinite; }
+.anim-bob-fast { animation: pixel-bob 0.3s infinite; }
+.anim-bob-slow { animation: pixel-bob 2.4s infinite; }
+
+/* Stepped side-to-side tilt: reads as walking for a front-facing sprite. */
+@keyframes pixel-waddle {
+  0%, 24% { transform: rotate(0) translateY(0); }
+  25%, 49% { transform: rotate(-5deg) translateY(-3px); }
+  50%, 74% { transform: rotate(0) translateY(0); }
+  75%, 100% { transform: rotate(5deg) translateY(-3px); }
+}
+.anim-waddle { animation: pixel-waddle 0.42s infinite; transform-origin: 50% 90%; }
+
+@keyframes pixel-shake {
+  0%, 24% { transform: translateX(0); }
+  25%, 49% { transform: translateX(-3px); }
+  50%, 74% { transform: translateX(0); }
+  75%, 100% { transform: translateX(3px); }
+}
+.anim-shake { animation: pixel-shake 0.25s infinite; }
+
+/* Hearts drifting up between the two pups. */
+@keyframes heart-puff {
+  0%, 55% { transform: translateY(0) scale(0.4); opacity: 0; }
+  65% { transform: translateY(-8px) scale(1); opacity: 1; }
+  100% { transform: translateY(-40px) scale(0.9); opacity: 0; }
+}
+.anim-heart-puff { animation: heart-puff 4.2s var(--ease-spring) infinite; }
+
+/* Cooldown sweep on action buttons; duration and delay are set inline. */
+@keyframes cooldown-sweep {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.anim-cooldown { animation-name: cooldown-sweep; animation-timing-function: linear; animation-fill-mode: forwards; transform-origin: left; }
+
+/* Low stat warning. */
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.anim-soft-pulse { animation: soft-pulse 1.4s var(--ease-spring) infinite; }
+
+/* Skeleton shimmer. */
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--line);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.35), transparent);
+  animation: shimmer 1.4s var(--ease-spring) infinite;
+}
+
+.sprite-sick { filter: saturate(0.6) hue-rotate(40deg) brightness(0.95); }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-bob, .anim-bob-fast, .anim-bob-slow, .anim-waddle, .anim-shake,
+  .anim-heart-puff, .anim-soft-pulse, .skeleton::after {
+    animation: none;
+  }
+  .anim-heart-puff { opacity: 1; }
+}
