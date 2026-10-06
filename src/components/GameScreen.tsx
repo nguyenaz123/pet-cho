@@ -2,10 +2,11 @@
 
 /* eslint-disable @next/next/no-img-element -- tiny pixel SVG icons */
 import { MotionConfig, motion } from "framer-motion";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import FriendsModal from "@/components/FriendsModal";
 import OfflineReportModal from "@/components/OfflineReportModal";
 import ProfileModal from "@/components/ProfileModal";
+import type { AccountUser } from "@/components/AccountSection";
 import ActionBar from "@/components/hud/ActionBar";
 import PetHeader from "@/components/hud/PetHeader";
 import StatBars from "@/components/hud/StatBars";
@@ -15,14 +16,20 @@ import { SfxProvider, useSfx } from "@/components/ui/SfxProvider";
 import Toasts from "@/components/ui/Toasts";
 import { COLUMN } from "@/components/ui/layout";
 import { useGameLoop } from "@/hooks/useGameLoop";
-import { isFirebaseConfigured } from "@/lib/firebase";
 import { usePetStore } from "@/store/usePetStore";
+import type { PetData } from "@/types/pet";
 
-export default function GameScreen() {
+interface Props {
+  /** The pet as stored in the database, loaded by the page on the server. */
+  initialPet: PetData;
+  user: AccountUser;
+}
+
+export default function GameScreen(props: Props) {
   return (
     <SfxProvider>
       <MotionConfig reducedMotion="user">
-        <Game />
+        <Game {...props} />
       </MotionConfig>
     </SfxProvider>
   );
@@ -35,9 +42,8 @@ const enter = (i: number) => ({
   transition: { duration: 0.7, delay: 0.06 * i, ease: [0.16, 1, 0.3, 1] as const },
 });
 
-function Game() {
+function Game({ initialPet, user }: Props) {
   const phase = usePetStore((s) => s.phase);
-  const error = usePetStore((s) => s.error);
   const pet = usePetStore((s) => s.pet);
   const activity = usePetStore((s) => s.activity);
   const toasts = usePetStore((s) => s.toasts);
@@ -50,26 +56,9 @@ function Game() {
   const { enabled: sfxEnabled, toggle: toggleSfx, play } = useSfx();
   const bark = useCallback(() => play("woof"), [play]);
 
-  useEffect(() => {
-    if (isFirebaseConfigured) void init();
-  }, [init]);
+  useEffect(() => init(initialPet), [init, initialPet]);
   useGameLoop(phase === "ready");
 
-  if (!isFirebaseConfigured) return <SetupNotice />;
-  if (phase === "error") {
-    return (
-      <Notice title="Something went wrong">
-        <p className="mb-5 break-words text-muted">{error}</p>
-        <PressButton
-          onClick={() => window.location.reload()}
-          burstColor="var(--on-accent)"
-          className="w-full rounded-full bg-accent py-3.5 font-semibold text-on-accent"
-        >
-          Try again
-        </PressButton>
-      </Notice>
-    );
-  }
   if (!pet) return <GameSkeleton />;
 
   const sleeping = pet.status === "SLEEPING";
@@ -78,13 +67,7 @@ function Game() {
     <main className={`${COLUMN} h-[100dvh]`}>
       <motion.header {...enter(0)} className="flex items-center gap-2 py-1">
         <PetHeader pet={pet} onRename={rename} />
-        <IconButton
-          label="Profile"
-          icon="dress"
-          disabled={sleeping}
-          title={sleeping ? "Shh... sleeping!" : "Profile"}
-          onClick={() => setProfileOpen(true)}
-        />
+        <IconButton label="Profile" icon="dress" onClick={() => setProfileOpen(true)} />
         <IconButton label="Friends" icon="friends" onClick={() => setFriendsOpen(true)} />
         <IconButton
           label={sfxEnabled ? "Mute sound" : "Turn sound on"}
@@ -111,11 +94,13 @@ function Game() {
       <ProfileModal
         open={profileOpen}
         pet={pet}
+        user={user}
+        sleeping={sleeping}
         onEquip={equip}
         onBreed={setBreed}
         onClose={() => setProfileOpen(false)}
       />
-      <FriendsModal open={friendsOpen} myUid={pet.ownerId} myPetName={pet.petName} onClose={() => setFriendsOpen(false)} />
+      <FriendsModal open={friendsOpen} onClose={() => setFriendsOpen(false)} />
       <OfflineReportModal report={offlineReport} onClose={dismissOfflineReport} />
       <Toasts toasts={toasts} onDismiss={dismissToast} />
     </main>
@@ -179,37 +164,5 @@ function GameSkeleton() {
         ))}
       </div>
     </main>
-  );
-}
-
-export function Notice({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <main className="flex min-h-[100dvh] items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="bezel w-full max-w-[440px]"
-      >
-        <div className="bezel-core px-6 py-7 text-[16px] leading-relaxed">
-          <h1 className="mb-4 font-display text-[13px] leading-relaxed">{title}</h1>
-          {children}
-        </div>
-      </motion.div>
-    </main>
-  );
-}
-
-function SetupNotice() {
-  return (
-    <Notice title="Setup needed">
-      <p className="mb-4 text-muted">Firebase is not configured yet.</p>
-      <ol className="list-decimal space-y-2 pl-5">
-        <li>Copy .env.local.example to .env.local</li>
-        <li>Fill in your Firebase web app keys</li>
-        <li>Enable Anonymous sign-in and Firestore</li>
-        <li>Restart npm run dev</li>
-      </ol>
-    </Notice>
   );
 }

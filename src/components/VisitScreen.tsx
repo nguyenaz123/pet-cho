@@ -4,94 +4,69 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { MotionConfig, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { IconButton, Notice } from "@/components/GameScreen";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { IconButton } from "@/components/GameScreen";
 import PetHeader from "@/components/hud/PetHeader";
 import StatBars from "@/components/hud/StatBars";
 import PetStage from "@/components/pet/PetStage";
+import Notice from "@/components/ui/Notice";
 import { SfxProvider, useSfx } from "@/components/ui/SfxProvider";
 import { COLUMN } from "@/components/ui/layout";
-import { isFirebaseConfigured } from "@/lib/firebase";
 import { calculateOfflineDecay } from "@/lib/game/engine";
-import { ensureAnonymousUser, watchPet } from "@/lib/petRepository";
 import type { PetData } from "@/types/pet";
 
 dayjs.extend(relativeTime);
 
 const TICK_MS = 1_000;
+/** How often to re-read the owner's latest save from the server while visiting. */
+const REFRESH_MS = 10_000;
 const NO_FLOATERS: never[] = [];
 const noop = () => {};
 
-export default function VisitScreen({ uid }: { uid: string }) {
+export default function VisitScreen({ saved }: { saved: PetData }) {
   return (
     <SfxProvider>
       <MotionConfig reducedMotion="user">
-        <Visit uid={uid} />
+        <Visit saved={saved} />
       </MotionConfig>
     </SfxProvider>
   );
 }
 
-type Loaded = { status: "loading" } | { status: "error"; message: string } | { status: "missing" } | { status: "ready"; saved: PetData };
+export function PupNotFound() {
+  return (
+    <Notice title="Pup not found">
+      <Link href="/" className="block w-full rounded-full bg-accent py-3.5 text-center font-semibold text-on-accent">
+        Back to my pup
+      </Link>
+    </Notice>
+  );
+}
 
 /**
- * Someone else's room, read-only. The stored document is only as fresh as the owner's
+ * Someone else's room, read-only. The stored row is only as fresh as the owner's
  * last save, so decay is replayed locally up to now for display. Nothing is ever written.
  */
-function Visit({ uid }: { uid: string }) {
+function Visit({ saved }: { saved: PetData }) {
   const router = useRouter();
   const { play } = useSfx();
   const bark = useCallback(() => play("woof"), [play]);
-  const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
-  const [pet, setPet] = useState<PetData | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  // Replayed from the latest save every tick, so a refreshed `saved` is picked up as is.
+  const pet = useMemo(() => calculateOfflineDecay(saved, Math.max(now, saved.lastUpdated)), [saved, now]);
 
   useEffect(() => {
-    if (!isFirebaseConfigured) return;
-    let unsubscribe: (() => void) | undefined;
-    let cancelled = false;
-    const fail = (err: unknown) => setLoaded({ status: "error", message: err instanceof Error ? err.message : String(err) });
-
-    ensureAnonymousUser()
-      .then(() => {
-        if (cancelled) return;
-        unsubscribe = watchPet(
-          uid,
-          (saved) => {
-            setLoaded(saved ? { status: "ready", saved } : { status: "missing" });
-            setPet(saved && calculateOfflineDecay(saved, Date.now()));
-          },
-          fail,
-        );
-      })
-      .catch(fail);
+    const tickId = setInterval(() => setNow(Date.now()), TICK_MS);
+    // Re-runs the server page, which re-reads the pet: a cheap stand-in for a live subscription.
+    const refreshId = setInterval(() => router.refresh(), REFRESH_MS);
     return () => {
-      cancelled = true;
-      unsubscribe?.();
+      clearInterval(tickId);
+      clearInterval(refreshId);
     };
-  }, [uid]);
-
-  const ready = pet !== null;
-  useEffect(() => {
-    if (!ready) return;
-    const id = setInterval(() => setPet((p) => p && calculateOfflineDecay(p, Date.now())), TICK_MS);
-    return () => clearInterval(id);
-  }, [ready]);
+  }, [router]);
 
   const goHome = () => router.push("/");
-
-  if (!isFirebaseConfigured || loaded.status === "error" || loaded.status === "missing") {
-    return (
-      <Notice title={loaded.status === "missing" ? "Pup not found" : "Something went wrong"}>
-        {loaded.status === "error" && <p className="mb-5 break-words text-muted">{loaded.message}</p>}
-        <button type="button" onClick={goHome} className="w-full rounded-full bg-accent py-3.5 font-semibold text-on-accent">
-          Back to my pup
-        </button>
-      </Notice>
-    );
-  }
-  if (loaded.status === "loading" || !pet) {
-    return <main className={COLUMN} aria-busy="true" aria-label="Loading" />;
-  }
 
   return (
     <main className={`${COLUMN} pb-[max(0.75rem,env(safe-area-inset-bottom))]`}>
@@ -115,7 +90,7 @@ function Visit({ uid }: { uid: string }) {
       </section>
 
       <p className="text-center text-[14px] text-muted">
-        Just visiting · last played {dayjs(loaded.saved.lastUpdated).fromNow()}
+        Just visiting · last played {dayjs(saved.lastUpdated).fromNow()}
       </p>
     </main>
   );

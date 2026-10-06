@@ -9,15 +9,22 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "sprites": "node scripts/generate-sprites.mjs",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@auth/drizzle-adapter": "^1.11.3",
     "dayjs": "^1.11.23",
-    "firebase": "^12.19.0",
+    "drizzle-orm": "^0.45.3",
     "framer-motion": "^13.5.0",
     "next": "16.3.8",
+    "next-auth": "^5.0.0-beta.32",
+    "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -25,6 +32,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",

@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- tiny pixel SVGs */
 import { motion } from "framer-motion";
 import { useState } from "react";
+import AccountSection, { type AccountUser } from "@/components/AccountSection";
 import Modal from "@/components/ui/Modal";
 import PressButton from "@/components/ui/PressButton";
 import PetSprite, { PetAvatar } from "@/components/pet/PetSprite";
@@ -15,6 +16,9 @@ import type { BreedId, EquipSlot, PetData } from "@/types/pet";
 interface Props {
   open: boolean;
   pet: PetData;
+  user: AccountUser;
+  /** No dressing up mid-nap; the account section stays usable. */
+  sleeping: boolean;
   onEquip: (slot: EquipSlot, itemId: string | null) => void;
   onBreed: (breed: BreedId) => void;
   onClose: () => void;
@@ -30,7 +34,7 @@ const TABS: { tab: Tab; label: string }[] = [
 
 const THUMB = 52;
 
-export default function ProfileModal({ open, pet, onEquip, onBreed, onClose }: Props) {
+export default function ProfileModal({ open, pet, user, sleeping, onEquip, onBreed, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("breed");
   const outfitKey = `${pet.breed}-${pet.equippedItems.hat}-${pet.equippedItems.clothes}`;
 
@@ -78,7 +82,9 @@ export default function ProfileModal({ open, pet, onEquip, onBreed, onClose }: P
       </div>
 
       <div role="tabpanel" className="mb-5 grid grid-cols-4 gap-2">
-        {tab === "breed"
+        {sleeping ? (
+          <p className="col-span-4 py-6 text-center text-muted">Shh... sleeping! Dress up after the nap.</p>
+        ) : tab === "breed"
           ? BREEDS.map((breed) => {
               const locked = breed.minLevel > pet.level;
               return (
@@ -114,11 +120,13 @@ export default function ProfileModal({ open, pet, onEquip, onBreed, onClose }: P
             })}
       </div>
 
+      <AccountSection user={user} />
+
       <PressButton
         sound="close"
         onClick={onClose}
         burstColor="var(--on-accent)"
-        className="mt-1 w-full rounded-full bg-accent py-3.5 text-[16px] font-semibold text-on-accent"
+        className="mt-4 w-full rounded-full bg-accent py-3.5 text-[16px] font-semibold text-on-accent"
       >
         Done
       </PressButton>

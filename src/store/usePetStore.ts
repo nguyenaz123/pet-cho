@@ -5,7 +5,7 @@ import { STAT_KEYS, applyAction, calculateOfflineDecay, getLifeStage, type StatD
 import { PARTNER_LEVEL, PARTNER_NAME, STAGE_LABEL } from "@/lib/game/constants";
 import { getBreed } from "@/lib/game/breeds";
 import { getWearable } from "@/lib/game/items";
-import { ensureAnonymousUser, loadOrCreatePet, savePet } from "@/lib/petRepository";
+import { putPet } from "@/lib/petApi";
 import type { BreedId, EquipSlot, PetAction, PetData, StatKey } from "@/types/pet";
 
 const STAT_LABEL: Record<StatKey, string> = { hunger: "Food", hygiene: "Clean", energy: "Energy", happiness: "Joy" };
@@ -41,8 +41,7 @@ export interface OfflineReport {
 }
 
 interface PetState {
-  phase: "idle" | "loading" | "ready" | "error";
-  error: string | null;
+  phase: "idle" | "ready";
   pet: PetData | null;
   activity: { type: Activity; until: number } | null;
   toasts: Toast[];
@@ -50,7 +49,8 @@ interface PetState {
   offlineReport: OfflineReport | null;
   dirty: boolean;
 
-  init: () => Promise<void>;
+  /** Starts the game with the pet the server loaded, catching up on time spent away. */
+  init: (stored: PetData) => void;
   /** Advances the simulation to Date.now(). Called by the game loop every second. */
   tick: () => void;
   perform: (action: PetAction) => void;
@@ -124,7 +124,6 @@ export const usePetStore = create<PetState>()((set, get) => {
 
   return {
     phase: "idle",
-    error: null,
     pet: null,
     activity: null,
     toasts: [],
@@ -132,26 +131,18 @@ export const usePetStore = create<PetState>()((set, get) => {
     offlineReport: null,
     dirty: false,
 
-    init: async () => {
-      if (get().phase === "loading" || get().phase === "ready") return;
-      set({ phase: "loading", error: null });
-      try {
-        const uid = await ensureAnonymousUser();
-        const stored = await loadOrCreatePet(uid);
-        const now = Date.now();
-        const caughtUp = calculateOfflineDecay(stored, now);
-        const elapsedMs = now - stored.lastUpdated;
+    init: (stored) => {
+      if (get().phase === "ready") return;
+      const now = Date.now();
+      const caughtUp = calculateOfflineDecay(stored, now);
+      const elapsedMs = now - stored.lastUpdated;
 
-        set({
-          phase: "ready",
-          pet: caughtUp,
-          offlineReport: elapsedMs >= OFFLINE_REPORT_MIN_MS ? { elapsedMs, before: stored, after: caughtUp } : null,
-        });
-        if (elapsedMs > 0) scheduleSave();
-      } catch (err) {
-        console.error(err);
-        set({ phase: "error", error: err instanceof Error ? err.message : String(err) });
-      }
+      set({
+        phase: "ready",
+        pet: caughtUp,
+        offlineReport: elapsedMs >= OFFLINE_REPORT_MIN_MS ? { elapsedMs, before: stored, after: caughtUp } : null,
+      });
+      if (elapsedMs > 0) scheduleSave();
     },
 
     tick: () => {
@@ -221,7 +212,7 @@ export const usePetStore = create<PetState>()((set, get) => {
       const { pet, dirty } = get();
       if (!pet || !dirty) return;
       set({ dirty: false });
-      saving = savePet(pet)
+      saving = putPet(pet)
         .catch((err) => {
           console.error("Save failed", err);
           set({ dirty: true });

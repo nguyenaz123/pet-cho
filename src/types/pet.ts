@@ -14,7 +14,7 @@ export type BreedId = "shiba" | "husky" | "choco" | "dalmatian" | "pug" | "poodl
 
 export type LifeStage = "PUPPY" | "TEEN" | "ADULT";
 
-/** Firestore document: pets/{userId} */
+/** Database row: pet (one per user, keyed by ownerId) */
 export interface PetData {
   ownerId: string;
   petName: string;

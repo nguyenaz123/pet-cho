@@ -1,67 +1,83 @@
-import { signInAnonymously } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
-import { getFirebase } from "@/lib/firebase";
+import "server-only";
+import { desc, eq, ne } from "drizzle-orm";
+import { db } from "@/db";
+import { pets } from "@/db/schema";
+import { getBreed } from "@/lib/game/breeds";
+import { MAX_LEVEL } from "@/lib/game/constants";
 import { createDefaultPet, normalizePet } from "@/lib/game/engine";
-import type { PetData } from "@/types/pet";
+import type { PetData, PetStatus } from "@/types/pet";
 
-/** Signs in anonymously (reusing the persisted session if there is one). */
-export async function ensureAnonymousUser(): Promise<string> {
-  const { auth } = getFirebase();
-  await auth.authStateReady();
-  const user = auth.currentUser ?? (await signInAnonymously(auth)).user;
-  return user.uid;
+const STATUSES: readonly PetStatus[] = ["NORMAL", "ESTRUS", "SLEEPING", "SICK"];
+const MAX_NAME_LENGTH = 16;
+const FRIENDS_LIMIT = 50;
+
+/** Loads the user's pet, creating a fresh puppy on first sign-in. */
+export async function loadOrCreatePet(ownerId: string): Promise<PetData> {
+  const pet = await getPet(ownerId);
+  if (pet) return pet;
+
+  const fresh = createDefaultPet(ownerId, Date.now());
+  await db.insert(pets).values(fresh).onConflictDoNothing();
+  return fresh;
 }
 
-const petRef = (uid: string) => doc(getFirebase().db, "pets", uid);
-
-/** Loads pets/{uid}, creating a fresh puppy on first launch. */
-export async function loadOrCreatePet(uid: string): Promise<PetData> {
-  const now = Date.now();
-  const snap = await getDoc(petRef(uid));
-  if (snap.exists()) return normalizePet(snap.data() as Partial<PetData>, uid, now);
-
-  const pet = createDefaultPet(uid, now);
-  await setDoc(petRef(uid), pet);
-  return pet;
+/** Anyone's pet, read-only; null if that user has no pet. */
+export async function getPet(ownerId: string): Promise<PetData | null> {
+  const [row] = await db.select().from(pets).where(eq(pets.ownerId, ownerId)).limit(1);
+  return row ? normalizePet(row, ownerId, Date.now()) : null;
 }
 
 export async function savePet(pet: PetData): Promise<void> {
-  await setDoc(petRef(pet.ownerId), pet);
+  await db.insert(pets).values(pet).onConflictDoUpdate({ target: pets.ownerId, set: pet });
 }
 
-const nameKey = (name: string) => name.trim().toLowerCase();
-/** Brand-new pups are all called this, so it can't tell players apart. */
-const DEFAULT_KEY = nameKey(createDefaultPet("", 0).petName);
+/** What the friends list shows about someone else's pet (no stats, no timers). */
+export type FriendPet = Pick<PetData, "ownerId" | "petName" | "breed" | "level" | "equippedItems" | "lastUpdated">;
 
 /**
- * Everyone else's pets, most recently played first. One player can own several
- * documents (anonymous sign-in makes a new uid per browser), so pets sharing a
- * name are treated as one player and only the newest is kept. Pups still wearing
- * the default name are hidden: they're mostly abandoned sessions, and the name
- * says nothing about who owns them.
+ * Everyone else's pets, most recently played first. Every account owns exactly one
+ * pet, so unlike the old anonymous setup there are no duplicates to filter out.
  */
-export async function listOtherPlayers(myUid: string, myPetName: string): Promise<PetData[]> {
-  const now = Date.now();
-  const snap = await getDocs(query(collection(getFirebase().db, "pets"), orderBy("lastUpdated", "desc")));
-  const myKey = nameKey(myPetName);
-  const seen = new Set<string>();
-  const out: PetData[] = [];
-  for (const d of snap.docs) {
-    if (d.id === myUid) continue;
-    const pet = normalizePet(d.data() as Partial<PetData>, d.id, now);
-    const key = nameKey(pet.petName);
-    if (key === DEFAULT_KEY || key === myKey || seen.has(key)) continue;
-    seen.add(key);
-    out.push(pet);
-  }
-  return out;
+export async function listOtherPlayers(myUid: string): Promise<FriendPet[]> {
+  return db
+    .select({
+      ownerId: pets.ownerId,
+      petName: pets.petName,
+      breed: pets.breed,
+      level: pets.level,
+      equippedItems: pets.equippedItems,
+      lastUpdated: pets.lastUpdated,
+    })
+    .from(pets)
+    .where(ne(pets.ownerId, myUid))
+    .orderBy(desc(pets.lastUpdated))
+    .limit(FRIENDS_LIMIT);
 }
 
-/** Live read-only view of someone's pet; calls back with null if it doesn't exist. */
-export function watchPet(uid: string, onChange: (pet: PetData | null) => void, onError: (err: Error) => void) {
-  return onSnapshot(
-    petRef(uid),
-    (snap) => onChange(snap.exists() ? normalizePet(snap.data() as Partial<PetData>, uid, Date.now()) : null),
-    onError,
-  );
+/**
+ * Validates a pet sent by the browser before it is stored. ownerId always comes
+ * from the session, never from the request body. Returns null when the payload is invalid.
+ */
+export function parsePet(input: unknown, ownerId: string): PetData | null {
+  if (typeof input !== "object" || input === null) return null;
+  const raw = input as Partial<PetData>;
+  const { level, status, petName, breed } = raw;
+  if (!Number.isInteger(level) || level! < 1 || level! > MAX_LEVEL) return null;
+  if (!STATUSES.includes(status as PetStatus)) return null;
+  if (typeof petName !== "string" || !petName.trim() || petName.length > MAX_NAME_LENGTH) return null;
+  if (breed !== undefined && !getBreed(breed)) return null;
+
+  const pet = normalizePet(raw, ownerId, Date.now());
+  if (!Number.isFinite(pet.exp) || !Number.isFinite(pet.lastUpdated)) return null;
+  // Epoch-ms columns are bigint; the simulation can produce fractional ms.
+  const round = (ms: number | null) => (ms == null ? null : Math.round(ms));
+  return {
+    ...pet,
+    ownerId,
+    lastUpdated: Math.round(pet.lastUpdated),
+    createdAt: Math.round(pet.createdAt),
+    pubertyAt: round(pet.pubertyAt),
+    estrusSoothedUntil: Math.round(pet.estrusSoothedUntil),
+    lastSickPenaltyAt: round(pet.lastSickPenaltyAt),
+  };
 }

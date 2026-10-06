@@ -8,42 +8,45 @@ import Modal from "@/components/ui/Modal";
 import PetSprite from "@/components/pet/PetSprite";
 import { STAGE_LABEL } from "@/lib/game/constants";
 import { getLifeStage } from "@/lib/game/engine";
-import { listOtherPlayers } from "@/lib/petRepository";
-import type { PetData } from "@/types/pet";
+import type { FriendPet } from "@/lib/petRepository";
 
 dayjs.extend(relativeTime);
 
 interface Props {
   open: boolean;
-  myUid: string;
-  myPetName: string;
   onClose: () => void;
 }
 
-type ListState = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; pets: PetData[] };
+type ListState = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; pets: FriendPet[] };
 
-export default function FriendsModal({ open, myUid, myPetName, onClose }: Props) {
+export default function FriendsModal({ open, onClose }: Props) {
   return (
     <Modal open={open} title="Friends" onClose={onClose}>
       {/* Mounted per opening, so the list is fetched fresh each time. */}
-      <FriendsList myUid={myUid} myPetName={myPetName} />
+      <FriendsList />
     </Modal>
   );
 }
 
-function FriendsList({ myUid, myPetName }: Omit<Props, "open" | "onClose">) {
+async function fetchFriends(): Promise<FriendPet[]> {
+  const res = await fetch("/api/friends");
+  if (!res.ok) throw new Error(`Could not load friends (${res.status})`);
+  return res.json();
+}
+
+function FriendsList() {
   const [list, setList] = useState<ListState>({ status: "loading" });
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    listOtherPlayers(myUid, myPetName)
+    fetchFriends()
       .then((pets) => !cancelled && setList({ status: "ready", pets }))
       .catch((err: unknown) => !cancelled && setList({ status: "error", message: err instanceof Error ? err.message : String(err) }));
     return () => {
       cancelled = true;
     };
-  }, [myUid, myPetName]);
+  }, []);
 
   const needle = filter.trim().toLowerCase();
   const shown = list.status === "ready" ? list.pets.filter((p) => p.petName.toLowerCase().includes(needle)) : [];
